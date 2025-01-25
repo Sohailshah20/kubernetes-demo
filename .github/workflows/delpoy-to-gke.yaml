@@ -1,0 +1,70 @@
+name: Production CI/CD Pipeline
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
+
+prod:
+    REGISTRY: gcr.io
+    PROJECT_ID: ${{ secrets.project_id }}
+    IMAGE_NAME: api-service
+
+jobs:
+    build-and-test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Docker layer caching
+              uses: actions/cache@v3
+              with:
+                  path: /tmp/.buildx-cache
+                  key: ${{ runner.os }}-buildx-${{ github.sha }}
+                  restore-keys: |
+                      ${{ runner.os }}-buildx-
+
+            - name: Setup Google Cloud
+              uses: google-github-actions/setup-gcloud@v1
+              with:
+                  project_id: ${{ secrets.project_id }}
+                  service_account_key: ${{ secrets.GCR_SA_KEY }}
+                  export_default_credentials: true
+
+            - name: Configure Docker
+              run: gcloud auth configure-docker
+
+            - name: Run Tests
+              run: make test # Adjust to your test command
+
+            - name: Build and Push Image
+              run: |
+                  docker buildx build \
+                    --cache-from=type=local,src=/tmp/.buildx-cache \
+                    --cache-to=type=local,dest=/tmp/.buildx-cache-new \
+                    --push \
+                    -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+                    -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest \
+                    .
+
+            - name: Move cache
+              run: |
+                  rm -rf /tmp/.buildx-cache
+                  mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+    # deploy:
+    #     needs: build-and-test
+    #     runs-on: ubuntu-latest
+    #     if: github.ref == 'refs/heads/master'
+
+    #     steps:
+    #         - name: Deploy to GKE
+    #           run: |
+    #               gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER }} \
+    #                 --zone ${{ secrets.GKE_ZONE }}
+    #               kubectl rollout restart deployment/${{ env.IMAGE_NAME }}
