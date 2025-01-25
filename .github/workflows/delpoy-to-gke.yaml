@@ -6,7 +6,7 @@ on:
     pull_request:
         branches: [master]
 
-prod:
+env:
     REGISTRY: gcr.io
     PROJECT_ID: ${{ secrets.project_id }}
     IMAGE_NAME: api-service
