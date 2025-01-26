@@ -15,6 +15,10 @@ jobs:
     build-and-test:
         runs-on: ubuntu-latest
 
+        permissions:
+            id-token: write # Required for Workload Identity Federation
+            contents: read # Required for checking out the code
+
         steps:
             - uses: actions/checkout@v4
 
@@ -29,12 +33,11 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-buildx-
 
-            - name: Setup Google Cloud
-              uses: google-github-actions/setup-gcloud@v1
+            - name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v1
               with:
-                  project_id: ${{ secrets.project_id }}
-                  service_account_key: ${{ secrets.GCR_SA_KEY }}
-                  export_default_credentials: true
+                  workload_identity_provider: `${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}`
+                  service_account: `${{ secrets.SERVICE_ACCOUNT }}`
 
             - name: Configure Docker
               run: gcloud auth configure-docker
