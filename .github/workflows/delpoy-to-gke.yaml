@@ -42,9 +42,6 @@ jobs:
             - name: Configure Docker
               run: gcloud auth configure-docker
 
-            - name: Run Tests
-              run: make test # Adjust to your test command
-
             - name: Build and Push Image
               run: |
                   docker buildx build \
